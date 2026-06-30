@@ -14,8 +14,13 @@ export type Status = (typeof STATUSES)[number];
 export const CLOSED_WON: Status = "Fechado";
 export const LOST_STATUSES: Status[] = ["Não interessado", "Perdido"];
 
-export const BROKERS = ["Victor", "Lucas"] as const;
+export const BROKERS = ["Não atribuído", "Victor", "Lucas"] as const;
 export type Broker = (typeof BROKERS)[number];
+
+export const ASSIGNABLE_BROKERS = BROKERS.filter((b) => b !== "Não atribuído") as Exclude<
+  Broker,
+  "Não atribuído"
+>[];
 
 export const TEMPERATURES = ["quente", "morno", "frio"] as const;
 export type Temperature = (typeof TEMPERATURES)[number];
@@ -23,7 +28,9 @@ export type Temperature = (typeof TEMPERATURES)[number];
 export interface Client {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
+  cpf: string | null;
+  birth_date: string | null;
   vigencia_date: string;
   broker: Broker;
   status: Status;

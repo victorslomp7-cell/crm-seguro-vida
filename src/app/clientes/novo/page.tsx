@@ -8,6 +8,8 @@ export default function NovoClientePage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [vigenciaDate, setVigenciaDate] = useState("");
   const [broker, setBroker] = useState("");
   const [error, setError] = useState("");
@@ -21,7 +23,14 @@ export default function NovoClientePage() {
       const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, vigencia_date: vigenciaDate, broker }),
+        body: JSON.stringify({
+          name,
+          phone: phone || null,
+          cpf: cpf || null,
+          birth_date: birthDate || null,
+          vigencia_date: vigenciaDate,
+          broker,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -45,13 +54,20 @@ export default function NovoClientePage() {
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div className="field">
-          <label>Telefone *</label>
+          <label>Telefone</label>
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="(11) 99999-9999"
-            required
           />
+        </div>
+        <div className="field">
+          <label>CPF</label>
+          <input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
+        </div>
+        <div className="field">
+          <label>Data de nascimento</label>
+          <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
         </div>
         <div className="field">
           <label>Data de início de vigência *</label>

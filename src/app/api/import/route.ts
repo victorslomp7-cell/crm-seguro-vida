@@ -25,12 +25,13 @@ function pick(row: Record<string, unknown>, candidates: string[]): unknown {
 function parseDate(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "number") {
-    // Excel serial date
-    const d = XLSX.SSF.parse_date_code(value);
-    if (!d) return null;
-    const mm = String(d.m).padStart(2, "0");
-    const dd = String(d.d).padStart(2, "0");
-    return `${d.y}-${mm}-${dd}`;
+    // Excel serial date (days since 1899-12-30)
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    epoch.setUTCDate(epoch.getUTCDate() + value);
+    const y = epoch.getUTCFullYear();
+    const mm = String(epoch.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(epoch.getUTCDate()).padStart(2, "0");
+    return `${y}-${mm}-${dd}`;
   }
   const str = String(value).trim();
   // dd/mm/yyyy
@@ -59,15 +60,18 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  // raw: true prevents xlsx from auto-detecting CSV date-like strings (e.g. "06/01/2026")
+  // and silently converting them to serial numbers using a US (MM/DD/YYYY) assumption,
+  // which would corrupt Brazilian dd/mm/yyyy dates.
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false, raw: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true });
 
   const now = new Date().toISOString();
   const insert = db.prepare(
-    `INSERT INTO clients (id, name, phone, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
-     VALUES (@id, @name, @phone, @vigencia_date, @broker, @status, @lead_temperature, NULL, 0, @now, @now)`
+    `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
+     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, NULL, 0, @now, @now)`
   );
 
   let imported = 0;
@@ -77,18 +81,21 @@ export async function POST(req: NextRequest) {
     items.forEach((row, idx) => {
       const name = pick(row, ["nome", "name", "cliente"]);
       const phone = pick(row, ["telefone", "phone", "celular", "contato"]);
+      const cpf = pick(row, ["cpf", "cpf_cnpj", "documento"]);
+      const birthDateRaw = pick(row, ["data de nascimento", "data nascimento", "nascimento", "data_nascimento"]);
       const vigenciaRaw = pick(row, [
         "data de inicio de vigencia",
         "data de vigencia",
         "vigencia",
         "data inicio vigencia",
         "inicio de vigencia",
+        "inicio_vigencia",
         "data_inicio_vigencia",
       ]);
       const brokerRaw = pick(row, ["corretor", "responsavel", "broker"]) ?? defaultBroker;
 
-      if (!name || !phone || !vigenciaRaw) {
-        errors.push({ row: idx + 2, reason: "Faltam dados obrigatórios (nome, telefone ou vigência)." });
+      if (!name || !vigenciaRaw) {
+        errors.push({ row: idx + 2, reason: "Faltam dados obrigatórios (nome ou vigência)." });
         return;
       }
 
@@ -98,16 +105,18 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const broker = String(brokerRaw || "").trim();
+      const broker = String(brokerRaw || "Não atribuído").trim();
       if (!BROKERS.includes(broker as (typeof BROKERS)[number])) {
-        errors.push({ row: idx + 2, reason: `Corretor responsável inválido ou ausente: "${broker}".` });
+        errors.push({ row: idx + 2, reason: `Corretor responsável inválido: "${broker}".` });
         return;
       }
 
       insert.run({
         id: randomUUID(),
         name: String(name).trim(),
-        phone: String(phone).trim(),
+        phone: phone ? String(phone).trim() : null,
+        cpf: cpf ? String(cpf).trim() : null,
+        birth_date: parseDate(birthDateRaw),
         vigencia_date,
         broker,
         status: STATUSES[0],

@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     params.today = new Date().toISOString().slice(0, 10);
   }
   if (q) {
-    where.push("(name LIKE @q OR phone LIKE @q)");
+    where.push("(name LIKE @q OR phone LIKE @q OR cpf LIKE @q)");
     params.q = `%${q}%`;
   }
 
@@ -81,25 +81,30 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { name, phone, vigencia_date, broker } = body;
+  const { name, vigencia_date, broker } = body;
+  const phone = body.phone || null;
+  const cpf = body.cpf || null;
+  const birth_date = body.birth_date || null;
 
-  if (!name || !phone || !vigencia_date) {
-    return NextResponse.json({ error: "Nome, telefone e data de vigência são obrigatórios." }, { status: 400 });
+  if (!name || !vigencia_date) {
+    return NextResponse.json({ error: "Nome e data de vigência são obrigatórios." }, { status: 400 });
   }
   if (!BROKERS.includes(broker)) {
-    return NextResponse.json({ error: "Corretor responsável é obrigatório (Victor ou Lucas)." }, { status: 400 });
+    return NextResponse.json({ error: "Corretor responsável inválido." }, { status: 400 });
   }
 
   const now = new Date().toISOString();
   const id = randomUUID();
 
   db.prepare(
-    `INSERT INTO clients (id, name, phone, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
-     VALUES (@id, @name, @phone, @vigencia_date, @broker, @status, @lead_temperature, @next_contact_date, 0, @now, @now)`
+    `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
+     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, @next_contact_date, 0, @now, @now)`
   ).run({
     id,
     name,
     phone,
+    cpf,
+    birth_date,
     vigencia_date,
     broker,
     status: STATUSES[0],

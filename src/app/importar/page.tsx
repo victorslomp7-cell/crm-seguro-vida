@@ -42,8 +42,9 @@ export default function ImportarPage() {
     <div>
       <h1>Importar planilha</h1>
       <p className="subtitle">
-        Envie um arquivo .xlsx ou .csv com as colunas: Nome, Telefone e Data de início de vigência. Você
-        também pode incluir uma coluna &ldquo;Corretor&rdquo; — se não houver, será usado o corretor padrão selecionado abaixo.
+        Envie um arquivo .xlsx ou .csv com as colunas: Nome e Data de início de vigência (obrigatórias).
+        Telefone, CPF e Data de nascimento são opcionais. Você também pode incluir uma coluna &ldquo;Corretor&rdquo;
+        — se não houver, será usado o corretor padrão selecionado abaixo ou, na ausência dele, &ldquo;Não atribuído&rdquo;.
       </p>
 
       <div className="card" style={{ maxWidth: 560 }}>

@@ -30,8 +30,10 @@ export function isOverdue(nextContactDate: string | null | undefined): boolean {
   return nextContactDate <= today;
 }
 
-export function whatsappLink(phone: string, message?: string): string {
+export function whatsappLink(phone: string | null | undefined, message?: string): string | null {
+  if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
   const withCountry = digits.length <= 11 ? `55${digits}` : digits;
   const text = message ? `?text=${encodeURIComponent(message)}` : "";
   return `https://wa.me/${withCountry}${text}`;

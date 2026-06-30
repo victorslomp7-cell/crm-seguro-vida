@@ -188,7 +188,7 @@ function ClientesContent() {
                   onClick={() => router.push(`/clientes/${c.id}`)}
                 >
                   <td>{c.name}</td>
-                  <td>{c.phone}</td>
+                  <td>{c.phone || "—"}</td>
                   <td>{c.broker}</td>
                   <td>
                     <StatusBadge status={c.status} />
@@ -203,14 +203,18 @@ function ClientesContent() {
                   </td>
                   <td>{c.call_attempts}</td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <a
-                      href={whatsappLink(c.phone)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-sm"
-                    >
-                      Abrir
-                    </a>
+                    {whatsappLink(c.phone) ? (
+                      <a
+                        href={whatsappLink(c.phone)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-sm"
+                      >
+                        Abrir
+                      </a>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               ))}

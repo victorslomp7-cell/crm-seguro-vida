@@ -98,19 +98,24 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
     ? scriptTemplate.replace("{nome}", client.name).replace("{vigencia}", formatDate(client.vigencia_date))
     : null;
 
+  const waLink = whatsappLink(client.phone);
+  const waScriptLink = whatsappLink(client.phone, scriptText || undefined);
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <h1>{client.name}</h1>
           <p className="subtitle">
-            {client.phone} · Vigência em {formatDate(client.vigencia_date)} · Corretor: {client.broker}
+            {client.phone || "Sem telefone"} · Vigência em {formatDate(client.vigencia_date)} · Corretor: {client.broker}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <a href={whatsappLink(client.phone)} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
-            Abrir WhatsApp
-          </a>
+          {waLink && (
+            <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+              Abrir WhatsApp
+            </a>
+          )}
           <button className="btn btn-danger" onClick={deleteClient}>
             Excluir
           </button>
@@ -119,6 +124,46 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
 
       <div className="two-col section">
         <div>
+          <div className="card section">
+            <h2>Dados do cliente</h2>
+            <div className="field">
+              <label>Telefone</label>
+              <input
+                defaultValue={client.phone || ""}
+                placeholder="(11) 99999-9999"
+                onBlur={(e) => {
+                  const value = e.target.value.trim() || null;
+                  if (value !== client.phone) patchClient({ phone: value });
+                }}
+                disabled={saving}
+              />
+            </div>
+            <div className="field">
+              <label>CPF</label>
+              <input
+                defaultValue={client.cpf || ""}
+                placeholder="000.000.000-00"
+                onBlur={(e) => {
+                  const value = e.target.value.trim() || null;
+                  if (value !== client.cpf) patchClient({ cpf: value });
+                }}
+                disabled={saving}
+              />
+            </div>
+            <div className="field">
+              <label>Data de nascimento</label>
+              <input
+                type="date"
+                defaultValue={client.birth_date || ""}
+                onBlur={(e) => {
+                  const value = e.target.value || null;
+                  if (value !== client.birth_date) patchClient({ birth_date: value });
+                }}
+                disabled={saving}
+              />
+            </div>
+          </div>
+
           <div className="card section">
             <h2>Status do contato</h2>
             <div className="field">
@@ -187,15 +232,17 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
             <div className="card section">
               <h2>Sugestão de script</h2>
               <p style={{ fontSize: 14, color: "var(--text-muted)", lineHeight: 1.5 }}>{scriptText}</p>
-              <a
-                href={whatsappLink(client.phone, scriptText)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-sm"
-                style={{ marginTop: 10 }}
-              >
-                Enviar pelo WhatsApp
-              </a>
+              {waScriptLink && (
+                <a
+                  href={waScriptLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm"
+                  style={{ marginTop: 10 }}
+                >
+                  Enviar pelo WhatsApp
+                </a>
+              )}
             </div>
           )}
 

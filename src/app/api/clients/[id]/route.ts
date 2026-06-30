@@ -5,6 +5,8 @@ import { BROKERS, STATUSES, TEMPERATURES } from "@/lib/types";
 const EDITABLE_FIELDS = [
   "name",
   "phone",
+  "cpf",
+  "birth_date",
   "vigencia_date",
   "broker",
   "status",
