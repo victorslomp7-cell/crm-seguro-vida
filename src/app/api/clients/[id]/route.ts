@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import type { InValue } from "@libsql/client";
+import { db, ready } from "@/lib/db";
 import { BROKERS, STATUSES, TEMPERATURES } from "@/lib/types";
 
 const EDITABLE_FIELDS = [
@@ -15,20 +16,25 @@ const EDITABLE_FIELDS = [
 ] as const;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await ready;
   const { id } = await params;
-  const client = db.prepare("SELECT * FROM clients WHERE id = ?").get(id);
+  const clientResult = await db.execute({ sql: "SELECT * FROM clients WHERE id = ?", args: [id] });
+  const client = clientResult.rows[0];
   if (!client) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
 
-  const notes = db
-    .prepare("SELECT * FROM notes WHERE client_id = ? ORDER BY datetime(created_at) DESC")
-    .all(id);
+  const notesResult = await db.execute({
+    sql: "SELECT * FROM notes WHERE client_id = ? ORDER BY datetime(created_at) DESC",
+    args: [id],
+  });
 
-  return NextResponse.json({ client, notes });
+  return NextResponse.json({ client, notes: notesResult.rows });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await ready;
   const { id } = await params;
-  const existing = db.prepare("SELECT * FROM clients WHERE id = ?").get(id);
+  const existingResult = await db.execute({ sql: "SELECT * FROM clients WHERE id = ?", args: [id] });
+  const existing = existingResult.rows[0];
   if (!existing) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
 
   const body = await req.json();
@@ -44,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const updates: string[] = [];
-  const data: Record<string, unknown> = { id };
+  const data: Record<string, InValue> = { id };
   for (const field of EDITABLE_FIELDS) {
     if (field in body) {
       updates.push(`${field} = @${field}`);
@@ -61,13 +67,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   data.updated_at = new Date().toISOString();
   updates.push("updated_at = @updated_at");
 
-  db.prepare(`UPDATE clients SET ${updates.join(", ")} WHERE id = @id`).run(data);
-  const client = db.prepare("SELECT * FROM clients WHERE id = ?").get(id);
-  return NextResponse.json(client);
+  await db.execute({
+    sql: `UPDATE clients SET ${updates.join(", ")} WHERE id = @id`,
+    args: data,
+  });
+  const clientResult = await db.execute({ sql: "SELECT * FROM clients WHERE id = ?", args: [id] });
+  return NextResponse.json(clientResult.rows[0]);
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await ready;
   const { id } = await params;
-  db.prepare("DELETE FROM clients WHERE id = ?").run(id);
+  await db.execute({ sql: "DELETE FROM clients WHERE id = ?", args: [id] });
   return NextResponse.json({ ok: true });
 }

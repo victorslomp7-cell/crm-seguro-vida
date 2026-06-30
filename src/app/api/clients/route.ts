@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import db from "@/lib/db";
+import { db, ready } from "@/lib/db";
 import { BROKERS, STATUSES, TEMPERATURES } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
+  await ready;
   const sp = req.nextUrl.searchParams;
   const status = sp.get("status");
   const broker = sp.get("broker");
@@ -75,11 +76,12 @@ export async function GET(req: NextRequest) {
   }
 
   const sql = `SELECT * FROM clients ${where.length ? "WHERE " + where.join(" AND ") : ""} ${orderBy}`;
-  const rows = db.prepare(sql).all(params);
-  return NextResponse.json(rows);
+  const result = await db.execute({ sql, args: params as Record<string, string> });
+  return NextResponse.json(result.rows);
 }
 
 export async function POST(req: NextRequest) {
+  await ready;
   const body = await req.json();
   const { name, vigencia_date, broker } = body;
   const phone = body.phone || null;
@@ -96,23 +98,24 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
   const id = randomUUID();
 
-  db.prepare(
-    `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
-     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, @next_contact_date, 0, @now, @now)`
-  ).run({
-    id,
-    name,
-    phone,
-    cpf,
-    birth_date,
-    vigencia_date,
-    broker,
-    status: STATUSES[0],
-    lead_temperature: TEMPERATURES[1],
-    next_contact_date: body.next_contact_date || null,
-    now,
+  await db.execute({
+    sql: `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
+     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, @next_contact_date, 0, @now, @now)`,
+    args: {
+      id,
+      name,
+      phone,
+      cpf,
+      birth_date,
+      vigencia_date,
+      broker,
+      status: STATUSES[0],
+      lead_temperature: TEMPERATURES[1],
+      next_contact_date: body.next_contact_date || null,
+      now,
+    },
   });
 
-  const client = db.prepare("SELECT * FROM clients WHERE id = ?").get(id);
-  return NextResponse.json(client, { status: 201 });
+  const result = await db.execute({ sql: "SELECT * FROM clients WHERE id = ?", args: [id] });
+  return NextResponse.json(result.rows[0], { status: 201 });
 }

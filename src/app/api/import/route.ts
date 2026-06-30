@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import * as XLSX from "xlsx";
-import db from "@/lib/db";
+import { db, ready } from "@/lib/db";
 import { BROKERS, STATUSES, TEMPERATURES } from "@/lib/types";
+import type { InValue } from "@libsql/client";
 
 function normalizeKey(key: string) {
   return key
@@ -51,6 +52,7 @@ function parseDate(value: unknown): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  await ready;
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const defaultBroker = formData.get("broker") as string | null;
@@ -69,49 +71,49 @@ export async function POST(req: NextRequest) {
   const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true });
 
   const now = new Date().toISOString();
-  const insert = db.prepare(
-    `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
-     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, NULL, 0, @now, @now)`
-  );
+  const insertSql = `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
+     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, NULL, 0, @now, @now)`;
 
   let imported = 0;
   const errors: { row: number; reason: string }[] = [];
+  const batchStatements: { sql: string; args: Record<string, InValue> }[] = [];
 
-  const tx = db.transaction((items: Record<string, unknown>[]) => {
-    items.forEach((row, idx) => {
-      const name = pick(row, ["nome", "name", "cliente"]);
-      const phone = pick(row, ["telefone", "phone", "celular", "contato"]);
-      const cpf = pick(row, ["cpf", "cpf_cnpj", "documento"]);
-      const birthDateRaw = pick(row, ["data de nascimento", "data nascimento", "nascimento", "data_nascimento"]);
-      const vigenciaRaw = pick(row, [
-        "data de inicio de vigencia",
-        "data de vigencia",
-        "vigencia",
-        "data inicio vigencia",
-        "inicio de vigencia",
-        "inicio_vigencia",
-        "data_inicio_vigencia",
-      ]);
-      const brokerRaw = pick(row, ["corretor", "responsavel", "broker"]) ?? defaultBroker;
+  rows.forEach((row, idx) => {
+    const name = pick(row, ["nome", "name", "cliente"]);
+    const phone = pick(row, ["telefone", "phone", "celular", "contato"]);
+    const cpf = pick(row, ["cpf", "cpf_cnpj", "documento"]);
+    const birthDateRaw = pick(row, ["data de nascimento", "data nascimento", "nascimento", "data_nascimento"]);
+    const vigenciaRaw = pick(row, [
+      "data de inicio de vigencia",
+      "data de vigencia",
+      "vigencia",
+      "data inicio vigencia",
+      "inicio de vigencia",
+      "inicio_vigencia",
+      "data_inicio_vigencia",
+    ]);
+    const brokerRaw = pick(row, ["corretor", "responsavel", "broker"]) ?? defaultBroker;
 
-      if (!name || !vigenciaRaw) {
-        errors.push({ row: idx + 2, reason: "Faltam dados obrigatórios (nome ou vigência)." });
-        return;
-      }
+    if (!name || !vigenciaRaw) {
+      errors.push({ row: idx + 2, reason: "Faltam dados obrigatórios (nome ou vigência)." });
+      return;
+    }
 
-      const vigencia_date = parseDate(vigenciaRaw);
-      if (!vigencia_date) {
-        errors.push({ row: idx + 2, reason: `Data de vigência inválida: "${vigenciaRaw}".` });
-        return;
-      }
+    const vigencia_date = parseDate(vigenciaRaw);
+    if (!vigencia_date) {
+      errors.push({ row: idx + 2, reason: `Data de vigência inválida: "${vigenciaRaw}".` });
+      return;
+    }
 
-      const broker = String(brokerRaw || "Não atribuído").trim();
-      if (!BROKERS.includes(broker as (typeof BROKERS)[number])) {
-        errors.push({ row: idx + 2, reason: `Corretor responsável inválido: "${broker}".` });
-        return;
-      }
+    const broker = String(brokerRaw || "Não atribuído").trim();
+    if (!BROKERS.includes(broker as (typeof BROKERS)[number])) {
+      errors.push({ row: idx + 2, reason: `Corretor responsável inválido: "${broker}".` });
+      return;
+    }
 
-      insert.run({
+    batchStatements.push({
+      sql: insertSql,
+      args: {
         id: randomUUID(),
         name: String(name).trim(),
         phone: phone ? String(phone).trim() : null,
@@ -122,12 +124,17 @@ export async function POST(req: NextRequest) {
         status: STATUSES[0],
         lead_temperature: TEMPERATURES[1],
         now,
-      });
-      imported++;
+      },
     });
+    imported++;
   });
 
-  tx(rows);
+  if (batchStatements.length) {
+    await db.batch(
+      batchStatements.map((s) => ({ sql: s.sql, args: s.args })),
+      "write"
+    );
+  }
 
   return NextResponse.json({ imported, total: rows.length, errors });
 }
