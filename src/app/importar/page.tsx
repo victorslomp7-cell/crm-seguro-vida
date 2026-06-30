@@ -16,6 +16,22 @@ export default function ImportarPage() {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
+  const [distributing, setDistributing] = useState(false);
+  const [distributeResult, setDistributeResult] = useState<{ assigned: number; victor: number; lucas: number } | null>(
+    null
+  );
+
+  async function handleDistribute() {
+    setDistributing(true);
+    setDistributeResult(null);
+    try {
+      const res = await fetch("/api/admin/distribute-brokers", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) setDistributeResult(data);
+    } finally {
+      setDistributing(false);
+    }
+  }
 
   async function handleUpload() {
     if (!file) return;
@@ -110,6 +126,24 @@ export default function ImportarPage() {
           </Link>
         </div>
       )}
+
+      <div className="card section" style={{ maxWidth: 560 }}>
+        <h2>Distribuir corretores</h2>
+        <p className="subtitle">
+          Divide automaticamente todos os clientes com corretor &ldquo;Não atribuído&rdquo; entre Victor e Lucas,
+          50% para cada um, em ordem embaralhada (não segue a ordem da planilha).
+        </p>
+        <button className="btn" onClick={handleDistribute} disabled={distributing}>
+          {distributing ? "Distribuindo..." : "Distribuir 50/50"}
+        </button>
+        {distributeResult && (
+          <p style={{ marginTop: 10 }}>
+            {distributeResult.assigned === 0
+              ? "Nenhum cliente sem corretor encontrado."
+              : `${distributeResult.assigned} cliente(s) distribuído(s): ${distributeResult.victor} para Victor, ${distributeResult.lucas} para Lucas.`}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
