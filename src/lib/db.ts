@@ -2,11 +2,14 @@ import { createClient } from "@libsql/client";
 import path from "path";
 import fs from "fs";
 
-const dataDir = path.join(process.cwd(), "data");
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-
-const url = process.env.TURSO_DATABASE_URL || `file:${path.join(dataDir, "crm.db")}`;
 const authToken = process.env.TURSO_AUTH_TOKEN;
+
+let url = process.env.TURSO_DATABASE_URL;
+if (!url) {
+  const dataDir = path.join(process.cwd(), "data");
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  url = `file:${path.join(dataDir, "crm.db")}`;
+}
 
 export const db = createClient(authToken ? { url, authToken } : { url });
 
