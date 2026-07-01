@@ -23,7 +23,7 @@ function ClientesContent() {
   const [nextContactTo, setNextContactTo] = useState(searchParams.get("nextContactTo") || "");
   const [dueOnly, setDueOnly] = useState(searchParams.get("dueOnly") === "1");
   const [q, setQ] = useState(searchParams.get("q") || "");
-  const [sort, setSort] = useState(searchParams.get("sort") || "priority");
+  const [sort, setSort] = useState(searchParams.get("sort") || "vigencia_asc");
 
   const query = useMemo(() => {
     const params = new URLSearchParams();

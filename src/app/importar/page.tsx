@@ -20,6 +20,22 @@ export default function ImportarPage() {
   const [distributeResult, setDistributeResult] = useState<{ assigned: number; victor: number; lucas: number } | null>(
     null
   );
+  const [clearing, setClearing] = useState(false);
+  const [clearResult, setClearResult] = useState<string | null>(null);
+
+  async function handleClear() {
+    if (!confirm("Tem certeza? Isso vai apagar TODOS os clientes permanentemente. Essa ação não pode ser desfeita."))
+      return;
+    setClearing(true);
+    setClearResult(null);
+    try {
+      const res = await fetch("/api/admin/clear-clients", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) setClearResult(`${data.deleted} cliente(s) removido(s).`);
+    } finally {
+      setClearing(false);
+    }
+  }
 
   async function handleDistribute() {
     setDistributing(true);
@@ -126,6 +142,15 @@ export default function ImportarPage() {
           </Link>
         </div>
       )}
+
+      <div className="card section" style={{ maxWidth: 560, borderColor: "var(--danger)" }}>
+        <h2 style={{ color: "var(--danger)" }}>Remover todos os clientes</h2>
+        <p className="subtitle">Apaga permanentemente todos os clientes do banco. Use antes de importar uma nova planilha.</p>
+        <button className="btn" style={{ background: "var(--danger)", color: "#fff" }} onClick={handleClear} disabled={clearing}>
+          {clearing ? "Removendo..." : "Apagar todos os clientes"}
+        </button>
+        {clearResult && <p style={{ marginTop: 10 }}>{clearResult}</p>}
+      </div>
 
       <div className="card section" style={{ maxWidth: 560 }}>
         <h2>Distribuir corretores</h2>
