@@ -212,8 +212,11 @@ export default function ClienteDetailPage({ params }: { params: Promise<{ id: st
               <label>Próximo contato</label>
               <input
                 type="date"
-                value={client.next_contact_date || ""}
-                onChange={(e) => patchClient({ next_contact_date: e.target.value || null })}
+                defaultValue={client.next_contact_date || ""}
+                onBlur={(e) => {
+                  const value = e.target.value || null;
+                  if (value !== client.next_contact_date) patchClient({ next_contact_date: value });
+                }}
                 disabled={saving}
               />
             </div>
