@@ -13,16 +13,28 @@ if (!url) {
 
 export const db = createClient(authToken ? { url, authToken } : { url });
 
-/** Run ALTER TABLE ADD COLUMN, ignoring errors if the column already exists */
-async function addColumnIfMissing(column: string, definition: string): Promise<void> {
-  try {
-    await db.execute(`ALTER TABLE clients ADD COLUMN ${column} ${definition}`);
-  } catch {
-    // Column likely already exists — safe to ignore
-  }
-}
+const CREATE_CLIENTS = `
+  CREATE TABLE clients_target (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT,
+    cpf TEXT,
+    birth_date TEXT,
+    vigencia_date TEXT NOT NULL,
+    broker TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Não contatado',
+    lead_temperature TEXT NOT NULL DEFAULT 'morno',
+    next_contact_date TEXT,
+    call_attempts INTEGER NOT NULL DEFAULT 0,
+    ramo TEXT NOT NULL DEFAULT 'vida',
+    tipo TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`;
 
 async function migrate(): Promise<void> {
+  // Ensure tables exist
   await db.execute(`
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
@@ -31,9 +43,9 @@ async function migrate(): Promise<void> {
       cpf TEXT,
       birth_date TEXT,
       vigencia_date TEXT NOT NULL,
-      broker TEXT NOT NULL CHECK (broker IN ('Não atribuído', 'Victor', 'Lucas')),
+      broker TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'Não contatado',
-      lead_temperature TEXT NOT NULL DEFAULT 'morno' CHECK (lead_temperature IN ('quente', 'morno', 'frio')),
+      lead_temperature TEXT NOT NULL DEFAULT 'morno',
       next_contact_date TEXT,
       call_attempts INTEGER NOT NULL DEFAULT 0,
       ramo TEXT NOT NULL DEFAULT 'vida',
@@ -55,15 +67,66 @@ async function migrate(): Promise<void> {
   await db.execute("CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status)");
   await db.execute("CREATE INDEX IF NOT EXISTS idx_clients_broker ON clients(broker)");
   await db.execute("CREATE INDEX IF NOT EXISTS idx_clients_next_contact ON clients(next_contact_date)");
-  await db.execute("CREATE INDEX IF NOT EXISTS idx_clients_ramo ON clients(ramo)");
   await db.execute("CREATE INDEX IF NOT EXISTS idx_notes_client ON notes(client_id)");
 
-  // Add columns that were introduced after the initial schema.
-  // Uses try/catch so it’s safe whether or not the column already exists.
-  await addColumnIfMissing("cpf", "TEXT");
-  await addColumnIfMissing("birth_date", "TEXT");
-  await addColumnIfMissing("ramo", "TEXT DEFAULT 'vida'");
-  await addColumnIfMissing("tipo", "TEXT");
+  // Detect missing columns by querying them directly.
+  // If a column is missing, recreate the table to add all missing columns at once.
+  let needsRamo = false;
+  let needsTipo = false;
+  let needsCpf = false;
+  let needsBirthDate = false;
+
+  try {
+    await db.execute("SELECT ramo FROM clients LIMIT 1");
+  } catch {
+    needsRamo = true;
+  }
+  try {
+    await db.execute("SELECT tipo FROM clients LIMIT 1");
+  } catch {
+    needsTipo = true;
+  }
+  try {
+    await db.execute("SELECT cpf FROM clients LIMIT 1");
+  } catch {
+    needsCpf = true;
+  }
+  try {
+    await db.execute("SELECT birth_date FROM clients LIMIT 1");
+  } catch {
+    needsBirthDate = true;
+  }
+
+  if (needsRamo || needsTipo || needsCpf || needsBirthDate) {
+    // Recreate the table with the full schema, copying existing data.
+    // We use COALESCE to fill in defaults for columns that didn’t exist.
+    const cpfCol = needsCpf ? "NULL" : "cpf";
+    const birthCol = needsBirthDate ? "NULL" : "birth_date";
+    const ramoCol = needsRamo ? "'vida'" : "ramo";
+    const tipoCol = needsTipo ? "NULL" : "tipo";
+
+    await db.batch(
+      [
+        CREATE_CLIENTS,
+        `INSERT INTO clients_target
+          SELECT id, name, phone, ${cpfCol}, ${birthCol}, vigencia_date, broker,
+                 status, lead_temperature, next_contact_date, call_attempts,
+                 ${ramoCol}, ${tipoCol}, created_at, updated_at
+          FROM clients`,
+        "DROP TABLE clients",
+        "ALTER TABLE clients_target RENAME TO clients",
+        "CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status)",
+        "CREATE INDEX IF NOT EXISTS idx_clients_broker ON clients(broker)",
+        "CREATE INDEX IF NOT EXISTS idx_clients_next_contact ON clients(next_contact_date)",
+        "CREATE INDEX IF NOT EXISTS idx_clients_ramo ON clients(ramo)",
+        "CREATE INDEX IF NOT EXISTS idx_notes_client ON notes(client_id)",
+      ],
+      "write"
+    );
+  } else {
+    // Table already has all columns; just ensure the ramo index exists
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_clients_ramo ON clients(ramo)");
+  }
 }
 
 export const ready: Promise<void> = migrate();
