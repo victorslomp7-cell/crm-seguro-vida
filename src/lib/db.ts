@@ -58,7 +58,7 @@ async function migrate(): Promise<void> {
   if (!columnNames.has("birth_date")) {
     await db.execute("ALTER TABLE clients ADD COLUMN birth_date TEXT");
   }
-  // Note: omit NOT NULL here — older SQLite/libsql versions reject NOT NULL on ALTER TABLE ADD COLUMN
+  // Omit NOT NULL — older SQLite/libsql rejects NOT NULL on ALTER TABLE ADD COLUMN
   if (!columnNames.has("ramo")) {
     await db.execute("ALTER TABLE clients ADD COLUMN ramo TEXT DEFAULT 'vida'");
   }
@@ -66,12 +66,20 @@ async function migrate(): Promise<void> {
     await db.execute("ALTER TABLE clients ADD COLUMN tipo TEXT");
   }
 
-  const tableSql = await db.execute(
-    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'clients'"
-  );
-  const brokerCheckOutdated = (tableSql.rows[0]?.sql as string | undefined)?.includes(
-    "CHECK (broker IN ('Victor', 'Lucas'))"
-  );
+  // Check if broker constraint needs migration (old DBs had only Victor/Lucas without 'Não atribuído')
+  // Wrap in try/catch since sqlite_master may not be available on all libsql hosts
+  let brokerCheckOutdated = false;
+  try {
+    const tableSql = await db.execute(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'clients'"
+    );
+    brokerCheckOutdated = (tableSql.rows[0]?.sql as string | undefined)?.includes(
+      "CHECK (broker IN ('Victor', 'Lucas'))"
+    ) ?? false;
+  } catch {
+    // sqlite_master not available (e.g. Turso remote) — assume no migration needed
+    brokerCheckOutdated = false;
+  }
 
   if (brokerCheckOutdated) {
     await db.batch(
