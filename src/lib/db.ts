@@ -58,8 +58,9 @@ async function migrate(): Promise<void> {
   if (!columnNames.has("birth_date")) {
     await db.execute("ALTER TABLE clients ADD COLUMN birth_date TEXT");
   }
+  // Note: omit NOT NULL here — older SQLite/libsql versions reject NOT NULL on ALTER TABLE ADD COLUMN
   if (!columnNames.has("ramo")) {
-    await db.execute("ALTER TABLE clients ADD COLUMN ramo TEXT NOT NULL DEFAULT 'vida'");
+    await db.execute("ALTER TABLE clients ADD COLUMN ramo TEXT DEFAULT 'vida'");
   }
   if (!columnNames.has("tipo")) {
     await db.execute("ALTER TABLE clients ADD COLUMN tipo TEXT");
