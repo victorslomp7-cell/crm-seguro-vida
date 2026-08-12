@@ -25,6 +25,9 @@ export const ASSIGNABLE_BROKERS = BROKERS.filter((b) => b !== "Não atribuído")
 export const TEMPERATURES = ["quente", "morno", "frio"] as const;
 export type Temperature = (typeof TEMPERATURES)[number];
 
+export const TIPOS_OUTROS = ["Residencial", "Empresarial"] as const;
+export type TipoOutros = (typeof TIPOS_OUTROS)[number];
+
 export interface Client {
   id: string;
   name: string;
@@ -37,6 +40,8 @@ export interface Client {
   lead_temperature: Temperature;
   next_contact_date: string | null;
   call_attempts: number;
+  ramo: string;
+  tipo: string | null;
   created_at: string;
   updated_at: string;
 }

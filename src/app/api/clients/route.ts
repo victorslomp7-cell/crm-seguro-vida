@@ -16,10 +16,20 @@ export async function GET(req: NextRequest) {
   const dueOnly = sp.get("dueOnly");
   const q = sp.get("q");
   const sort = sp.get("sort") || "priority";
+  const ramo = sp.get("ramo");
+  const tipo = sp.get("tipo");
 
   const where: string[] = [];
   const params: Record<string, unknown> = {};
 
+  if (ramo) {
+    where.push("ramo = @ramo");
+    params.ramo = ramo;
+  }
+  if (tipo) {
+    where.push("tipo = @tipo");
+    params.tipo = tipo;
+  }
   if (status) {
     where.push("status = @status");
     params.status = status;
@@ -59,7 +69,6 @@ export async function GET(req: NextRequest) {
 
   let orderBy = "ORDER BY datetime(updated_at) DESC";
   if (sort === "priority") {
-    // overdue/soonest follow-ups first, then hottest leads, then most recent vigencia
     orderBy = `ORDER BY
       CASE WHEN next_contact_date IS NULL THEN 1 ELSE 0 END,
       next_contact_date ASC,
@@ -87,6 +96,8 @@ export async function POST(req: NextRequest) {
   const phone = body.phone || null;
   const cpf = body.cpf || null;
   const birth_date = body.birth_date || null;
+  const ramo = body.ramo || "vida";
+  const tipo = body.tipo || null;
 
   if (!name || !vigencia_date) {
     return NextResponse.json({ error: "Nome e data de vigência são obrigatórios." }, { status: 400 });
@@ -99,19 +110,15 @@ export async function POST(req: NextRequest) {
   const id = randomUUID();
 
   await db.execute({
-    sql: `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
-     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, @next_contact_date, 0, @now, @now)`,
+    sql: `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, ramo, tipo, created_at, updated_at)
+     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, @next_contact_date, 0, @ramo, @tipo, @now, @now)`,
     args: {
-      id,
-      name,
-      phone,
-      cpf,
-      birth_date,
-      vigencia_date,
-      broker,
+      id, name, phone, cpf, birth_date, vigencia_date, broker,
       status: STATUSES[0],
       lead_temperature: TEMPERATURES[1],
       next_contact_date: body.next_contact_date || null,
+      ramo,
+      tipo,
       now,
     },
   });

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 async function getDashboardData() {
   await ready;
-  const ramo = "vida";
+  const ramo = "outros";
   const total = ((await db.execute({ sql: "SELECT COUNT(*) AS c FROM clients WHERE ramo = ?", args: [ramo] })).rows[0] as unknown as { c: number }).c;
   const contacted = ((await db.execute({ sql: "SELECT COUNT(*) AS c FROM clients WHERE ramo = ? AND status != 'Não contatado'", args: [ramo] })).rows[0] as unknown as { c: number }).c;
   const closed = ((await db.execute({ sql: "SELECT COUNT(*) AS c FROM clients WHERE ramo = ? AND status = 'Fechado'", args: [ramo] })).rows[0] as unknown as { c: number }).c;
@@ -17,6 +17,7 @@ async function getDashboardData() {
   })).rows[0] as unknown as { c: number }).c;
   const overdueFollowUps = ((await db.execute({ sql: "SELECT COUNT(*) AS c FROM clients WHERE ramo = ? AND next_contact_date IS NOT NULL AND next_contact_date <= date('now')", args: [ramo] })).rows[0] as unknown as { c: number }).c;
   const byStatus = (await db.execute({ sql: "SELECT status, COUNT(*) AS count FROM clients WHERE ramo = ? GROUP BY status", args: [ramo] })).rows as unknown as { status: Status; count: number }[];
+  const byTipo = (await db.execute({ sql: "SELECT tipo, COUNT(*) AS count FROM clients WHERE ramo = ? GROUP BY tipo", args: [ramo] })).rows as unknown as { tipo: string | null; count: number }[];
 
   const byBroker = await Promise.all(
     BROKERS.map(async (broker) => {
@@ -31,52 +32,33 @@ async function getDashboardData() {
     })
   );
 
-  return { total, contacted, closed, lost, conversionRate: total > 0 ? closed / total : 0, overdueFollowUps, byStatus, byBroker };
+  return { total, contacted, closed, lost, conversionRate: total > 0 ? closed / total : 0, overdueFollowUps, byStatus, byTipo, byBroker };
 }
 
-export default async function DashboardPage() {
+export default async function ResidencialDashboardPage() {
   const data = await getDashboardData();
 
   return (
     <div>
-      <h1>Dashboard — Seguro de Vida</h1>
-      <p className="subtitle">Visão geral da campanha de upsell de seguro de vida.</p>
+      <h1>Dashboard — Residencial / Empresarial</h1>
+      <p className="subtitle">Visão geral da carteira de seguros residenciais e empresariais.</p>
 
       <div className="grid grid-stats section">
+        <div className="card"><div className="stat-value">{data.total}</div><div className="stat-label">Total de clientes</div></div>
+        <div className="card"><div className="stat-value">{data.contacted}</div><div className="stat-label">Já contatados</div></div>
+        <div className="card"><div className="stat-value">{(data.conversionRate * 100).toFixed(1)}%</div><div className="stat-label">Taxa de conversão</div></div>
+        <div className="card"><div className="stat-value">{data.closed}</div><div className="stat-label">Fechados</div></div>
+        <div className="card"><div className="stat-value">{data.lost}</div><div className="stat-label">Recusados / perdidos</div></div>
         <div className="card">
-          <div className="stat-value">{data.total}</div>
-          <div className="stat-label">Total de clientes</div>
-        </div>
-        <div className="card">
-          <div className="stat-value">{data.contacted}</div>
-          <div className="stat-label">Já contatados</div>
-        </div>
-        <div className="card">
-          <div className="stat-value">{(data.conversionRate * 100).toFixed(1)}%</div>
-          <div className="stat-label">Taxa de conversão</div>
-        </div>
-        <div className="card">
-          <div className="stat-value">{data.closed}</div>
-          <div className="stat-label">Fechados</div>
-        </div>
-        <div className="card">
-          <div className="stat-value">{data.lost}</div>
-          <div className="stat-label">Recusados / perdidos</div>
-        </div>
-        <div className="card">
-          <div className="stat-value" style={{ color: data.overdueFollowUps > 0 ? "var(--danger)" : undefined }}>
-            {data.overdueFollowUps}
-          </div>
+          <div className="stat-value" style={{ color: data.overdueFollowUps > 0 ? "var(--danger)" : undefined }}>{data.overdueFollowUps}</div>
           <div className="stat-label">Follow-ups atrasados/hoje</div>
         </div>
       </div>
 
       {data.overdueFollowUps > 0 && (
         <div className="card section" style={{ borderColor: "var(--danger)", background: "#fff5f5" }}>
-          <strong style={{ color: "var(--danger)" }}>
-            {data.overdueFollowUps} cliente(s) com follow-up vencido ou para hoje.
-          </strong>{" "}
-          <Link href="/clientes?dueOnly=1" className="btn btn-sm" style={{ marginLeft: 10 }}>Ver lista</Link>
+          <strong style={{ color: "var(--danger)" }}>{data.overdueFollowUps} cliente(s) com follow-up vencido ou para hoje.</strong>{" "}
+          <Link href="/residencial/clientes?dueOnly=1" className="btn btn-sm" style={{ marginLeft: 10 }}>Ver lista</Link>
         </div>
       )}
 
@@ -84,52 +66,54 @@ export default async function DashboardPage() {
         <div className="card">
           <h2>Performance por corretor</h2>
           <table>
-            <thead>
-              <tr>
-                <th>Corretor</th><th>Total</th><th>Contatados</th><th>Fechados</th><th>Perdidos</th><th>Conversão</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Corretor</th><th>Total</th><th>Contatados</th><th>Fechados</th><th>Perdidos</th><th>Conversão</th></tr></thead>
             <tbody>
               {data.byBroker.map((b) => (
-                <tr key={b.broker}>
-                  <td>{b.broker}</td><td>{b.total}</td><td>{b.contacted}</td><td>{b.closed}</td><td>{b.lost}</td><td>{(b.conversionRate * 100).toFixed(1)}%</td>
-                </tr>
+                <tr key={b.broker}><td>{b.broker}</td><td>{b.total}</td><td>{b.contacted}</td><td>{b.closed}</td><td>{b.lost}</td><td>{(b.conversionRate * 100).toFixed(1)}%</td></tr>
               ))}
             </tbody>
           </table>
         </div>
 
         <div className="card">
-          <h2>Clientes por status</h2>
+          <h2>Por segmento</h2>
+          {data.byTipo.length === 0 ? (
+            <p className="subtitle">Nenhum cliente cadastrado ainda.</p>
+          ) : (
+            data.byTipo.map((t) => (
+              <div key={t.tipo || "sem tipo"} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                <span>{t.tipo || "Não definido"}</span>
+                <strong>{t.count}</strong>
+              </div>
+            ))
+          )}
+
+          <h2 style={{ marginTop: 20 }}>Por status</h2>
           {data.byStatus.length === 0 ? (
             <p className="subtitle">Nenhum cliente cadastrado ainda.</p>
           ) : (
-            <div>
-              {data.byStatus.map((s) => {
-                const colors = STATUS_COLORS[s.status] ?? { bg: "#eef0f4", fg: "#475467" };
-                const pct = data.total > 0 ? (s.count / data.total) * 100 : 0;
-                return (
-                  <div key={s.status} style={{ marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                      <span>{s.status}</span><span>{s.count}</span>
-                    </div>
-                    <div style={{ background: "#eef0f4", borderRadius: 6, height: 8, overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, background: colors.fg, height: "100%" }} />
-                    </div>
+            data.byStatus.map((s) => {
+              const colors = STATUS_COLORS[s.status] ?? { bg: "#eef0f4", fg: "#475467" };
+              const pct = data.total > 0 ? (s.count / data.total) * 100 : 0;
+              return (
+                <div key={s.status} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span>{s.status}</span><span>{s.count}</span></div>
+                  <div style={{ background: "#eef0f4", borderRadius: 6, height: 8, overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, background: colors.fg, height: "100%" }} />
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
 
       {data.total === 0 && (
         <div className="card empty-state">
-          <p>Você ainda não tem clientes de seguro de vida cadastrados.</p>
+          <p>Você ainda não tem clientes residenciais ou empresariais cadastrados.</p>
           <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14 }}>
-            <Link href="/importar" className="btn btn-primary">Importar planilha</Link>
-            <Link href="/clientes/novo" className="btn">Cadastrar manualmente</Link>
+            <Link href="/residencial/importar" className="btn btn-primary">Importar planilha</Link>
+            <Link href="/residencial/clientes/novo" className="btn">Cadastrar manualmente</Link>
           </div>
         </div>
       )}

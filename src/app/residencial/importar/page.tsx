@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BROKERS } from "@/lib/types";
+import { BROKERS, TIPOS_OUTROS } from "@/lib/types";
 
 interface ImportResult {
   imported: number;
@@ -10,9 +10,10 @@ interface ImportResult {
   errors: { row: number; reason: string }[];
 }
 
-export default function ImportarPage() {
+export default function ImportarResidencialPage() {
   const [file, setFile] = useState<File | null>(null);
   const [defaultBroker, setDefaultBroker] = useState("");
+  const [defaultTipo, setDefaultTipo] = useState("");
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
@@ -22,10 +23,10 @@ export default function ImportarPage() {
   const [clearResult, setClearResult] = useState<string | null>(null);
 
   async function handleClear() {
-    if (!confirm("Tem certeza? Isso vai apagar TODOS os clientes de Seguro de Vida permanentemente.")) return;
+    if (!confirm("Tem certeza? Isso vai apagar TODOS os clientes Residenciais/Empresariais permanentemente.")) return;
     setClearing(true); setClearResult(null);
     try {
-      const res = await fetch("/api/admin/clear-clients?ramo=vida", { method: "POST" });
+      const res = await fetch("/api/admin/clear-clients?ramo=outros", { method: "POST" });
       const data = await res.json();
       if (res.ok) setClearResult(`${data.deleted} cliente(s) removido(s).`);
     } finally { setClearing(false); }
@@ -34,7 +35,7 @@ export default function ImportarPage() {
   async function handleDistribute() {
     setDistributing(true); setDistributeResult(null);
     try {
-      const res = await fetch("/api/admin/distribute-brokers?ramo=vida", { method: "POST" });
+      const res = await fetch("/api/admin/distribute-brokers?ramo=outros", { method: "POST" });
       const data = await res.json();
       if (res.ok) setDistributeResult(data);
     } finally { setDistributing(false); }
@@ -46,8 +47,9 @@ export default function ImportarPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("ramo", "vida");
+      formData.append("ramo", "outros");
       if (defaultBroker) formData.append("broker", defaultBroker);
+      if (defaultTipo) formData.append("tipo", defaultTipo);
       const res = await fetch("/api/import", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erro ao importar planilha."); return; }
@@ -57,10 +59,17 @@ export default function ImportarPage() {
 
   return (
     <div>
-      <h1>Importar planilha — Seguro de Vida</h1>
-      <p className="subtitle">Envie um arquivo .xlsx ou .csv com as colunas: Nome e Data de início de vigência (obrigatórias).</p>
+      <h1>Importar planilha — Residencial / Empresarial</h1>
+      <p className="subtitle">Envie um arquivo .xlsx ou .csv. Colunas obrigatórias: Nome e Data de início de vigência.</p>
 
       <div className="card" style={{ maxWidth: 560 }}>
+        <div className="field">
+          <label>Segmento padrão (quando a planilha não tiver coluna &ldquo;Tipo&rdquo;)</label>
+          <select value={defaultTipo} onChange={(e) => setDefaultTipo(e.target.value)}>
+            <option value="">Não definido</option>
+            {TIPOS_OUTROS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
         <div className="field">
           <label>Corretor padrão (quando a planilha não tiver essa coluna)</label>
           <select value={defaultBroker} onChange={(e) => setDefaultBroker(e.target.value)}>
@@ -87,13 +96,13 @@ export default function ImportarPage() {
             <table><thead><tr><th>Linha</th><th>Motivo</th></tr></thead>
             <tbody>{result.errors.map((e, i) => <tr key={i}><td>{e.row}</td><td>{e.reason}</td></tr>)}</tbody></table></>
           )}
-          <Link href="/clientes" className="btn btn-primary" style={{ marginTop: 14, display: "inline-block" }}>Ver clientes importados</Link>
+          <Link href="/residencial/clientes" className="btn btn-primary" style={{ marginTop: 14, display: "inline-block" }}>Ver clientes importados</Link>
         </div>
       )}
 
       <div className="card section" style={{ maxWidth: 560, borderColor: "var(--danger)" }}>
-        <h2 style={{ color: "var(--danger)" }}>Remover todos os clientes de Vida</h2>
-        <p className="subtitle">Apaga permanentemente todos os clientes de Seguro de Vida. Use antes de importar uma nova planilha.</p>
+        <h2 style={{ color: "var(--danger)" }}>Remover todos os clientes Residencial/Empresarial</h2>
+        <p className="subtitle">Apaga permanentemente todos os clientes deste ramo. Os clientes de Seguro de Vida não são afetados.</p>
         <button className="btn" style={{ background: "var(--danger)", color: "#fff" }} onClick={handleClear} disabled={clearing}>
           {clearing ? "Removendo..." : "Apagar todos os clientes"}
         </button>
@@ -102,7 +111,7 @@ export default function ImportarPage() {
 
       <div className="card section" style={{ maxWidth: 560 }}>
         <h2>Distribuir corretores</h2>
-        <p className="subtitle">Divide os clientes de Vida sem corretor entre Victor e Lucas, 50% para cada um, em ordem embaralhada.</p>
+        <p className="subtitle">Divide os clientes Residencial/Empresarial sem corretor entre Victor e Lucas, 50% para cada um.</p>
         <button className="btn" onClick={handleDistribute} disabled={distributing}>
           {distributing ? "Distribuindo..." : "Distribuir 50/50"}
         </button>

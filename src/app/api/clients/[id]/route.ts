@@ -13,6 +13,8 @@ const EDITABLE_FIELDS = [
   "status",
   "lead_temperature",
   "next_contact_date",
+  "ramo",
+  "tipo",
 ] as const;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

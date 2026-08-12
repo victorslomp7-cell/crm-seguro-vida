@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BROKERS, Client, STATUSES, TEMPERATURES } from "@/lib/types";
+import { BROKERS, Client, STATUSES, TEMPERATURES, TIPOS_OUTROS } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
 import { formatDate, isOverdue, whatsappLink } from "@/lib/ui";
 
@@ -17,6 +17,7 @@ function ClientesContent() {
   const [status, setStatus] = useState(searchParams.get("status") || "");
   const [broker, setBroker] = useState(searchParams.get("broker") || "");
   const [temperature, setTemperature] = useState(searchParams.get("temperature") || "");
+  const [tipo, setTipo] = useState(searchParams.get("tipo") || "");
   const [vigenciaFrom, setVigenciaFrom] = useState(searchParams.get("vigenciaFrom") || "");
   const [vigenciaTo, setVigenciaTo] = useState(searchParams.get("vigenciaTo") || "");
   const [nextContactFrom, setNextContactFrom] = useState(searchParams.get("nextContactFrom") || "");
@@ -27,10 +28,11 @@ function ClientesContent() {
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
-    params.set("ramo", "vida");
+    params.set("ramo", "outros");
     if (status) params.set("status", status);
     if (broker) params.set("broker", broker);
     if (temperature) params.set("temperature", temperature);
+    if (tipo) params.set("tipo", tipo);
     if (vigenciaFrom) params.set("vigenciaFrom", vigenciaFrom);
     if (vigenciaTo) params.set("vigenciaTo", vigenciaTo);
     if (nextContactFrom) params.set("nextContactFrom", nextContactFrom);
@@ -39,7 +41,7 @@ function ClientesContent() {
     if (q) params.set("q", q);
     params.set("sort", sort);
     return params.toString();
-  }, [status, broker, temperature, vigenciaFrom, vigenciaTo, nextContactFrom, nextContactTo, dueOnly, q, sort]);
+  }, [status, broker, temperature, tipo, vigenciaFrom, vigenciaTo, nextContactFrom, nextContactTo, dueOnly, q, sort]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -52,6 +54,7 @@ function ClientesContent() {
     if (status) urlParams.set("status", status);
     if (broker) urlParams.set("broker", broker);
     if (temperature) urlParams.set("temperature", temperature);
+    if (tipo) urlParams.set("tipo", tipo);
     if (vigenciaFrom) urlParams.set("vigenciaFrom", vigenciaFrom);
     if (vigenciaTo) urlParams.set("vigenciaTo", vigenciaTo);
     if (nextContactFrom) urlParams.set("nextContactFrom", nextContactFrom);
@@ -59,7 +62,7 @@ function ClientesContent() {
     if (dueOnly) urlParams.set("dueOnly", "1");
     if (q) urlParams.set("q", q);
     urlParams.set("sort", sort);
-    router.replace(`/clientes?${urlParams.toString()}`, { scroll: false });
+    router.replace(`/residencial/clientes?${urlParams.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
@@ -67,17 +70,21 @@ function ClientesContent() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h1>Clientes — Seguro de Vida</h1>
+          <h1>Clientes — Residencial / Empresarial</h1>
           <p className="subtitle">{clients.length} cliente(s) encontrados.</p>
         </div>
-        <Link href="/clientes/novo" className="btn btn-primary">+ Novo cliente</Link>
+        <Link href="/residencial/clientes/novo" className="btn btn-primary">+ Novo cliente</Link>
       </div>
 
       <div className="card section">
         <div className="filters">
+          <div className="filter-field"><label>Buscar</label><input placeholder="Nome ou telefone" value={q} onChange={(e) => setQ(e.target.value)} /></div>
           <div className="filter-field">
-            <label>Buscar</label>
-            <input placeholder="Nome ou telefone" value={q} onChange={(e) => setQ(e.target.value)} />
+            <label>Segmento</label>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              <option value="">Todos</option>
+              {TIPOS_OUTROS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
           <div className="filter-field">
             <label>Status</label>
@@ -100,22 +107,10 @@ function ClientesContent() {
               {TEMPERATURES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <div className="filter-field">
-            <label>Vigência de</label>
-            <input type="date" value={vigenciaFrom} onChange={(e) => setVigenciaFrom(e.target.value)} />
-          </div>
-          <div className="filter-field">
-            <label>Vigência até</label>
-            <input type="date" value={vigenciaTo} onChange={(e) => setVigenciaTo(e.target.value)} />
-          </div>
-          <div className="filter-field">
-            <label>Próx. contato de</label>
-            <input type="date" value={nextContactFrom} onChange={(e) => setNextContactFrom(e.target.value)} />
-          </div>
-          <div className="filter-field">
-            <label>Próx. contato até</label>
-            <input type="date" value={nextContactTo} onChange={(e) => setNextContactTo(e.target.value)} />
-          </div>
+          <div className="filter-field"><label>Vigência de</label><input type="date" value={vigenciaFrom} onChange={(e) => setVigenciaFrom(e.target.value)} /></div>
+          <div className="filter-field"><label>Vigência até</label><input type="date" value={vigenciaTo} onChange={(e) => setVigenciaTo(e.target.value)} /></div>
+          <div className="filter-field"><label>Próx. contato de</label><input type="date" value={nextContactFrom} onChange={(e) => setNextContactFrom(e.target.value)} /></div>
+          <div className="filter-field"><label>Próx. contato até</label><input type="date" value={nextContactTo} onChange={(e) => setNextContactTo(e.target.value)} /></div>
           <div className="filter-field">
             <label>Ordenar por</label>
             <select value={sort} onChange={(e) => setSort(e.target.value)}>
@@ -127,10 +122,10 @@ function ClientesContent() {
             </select>
           </div>
           <div className="filter-field" style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 9 }}>
-            <input type="checkbox" style={{ width: "auto" }} checked={dueOnly} onChange={(e) => setDueOnly(e.target.checked)} id="dueOnly" />
-            <label htmlFor="dueOnly" style={{ marginBottom: 0 }}>Só follow-up vencido</label>
+            <input type="checkbox" style={{ width: "auto" }} checked={dueOnly} onChange={(e) => setDueOnly(e.target.checked)} id="dueOnlyRes" />
+            <label htmlFor="dueOnlyRes" style={{ marginBottom: 0 }}>Só follow-up vencido</label>
           </div>
-          <button className="btn btn-sm" onClick={() => { setStatus(""); setBroker(""); setTemperature(""); setVigenciaFrom(""); setVigenciaTo(""); setNextContactFrom(""); setNextContactTo(""); setDueOnly(false); setQ(""); setSort("vigencia_asc"); }}>Limpar filtros</button>
+          <button className="btn btn-sm" onClick={() => { setStatus(""); setBroker(""); setTemperature(""); setTipo(""); setVigenciaFrom(""); setVigenciaTo(""); setNextContactFrom(""); setNextContactTo(""); setDueOnly(false); setQ(""); setSort("vigencia_asc"); }}>Limpar filtros</button>
         </div>
       </div>
 
@@ -143,24 +138,22 @@ function ClientesContent() {
           <table>
             <thead>
               <tr>
-                <th>Nome</th><th>Telefone</th><th>Corretor</th><th>Status</th><th>Lead</th><th>Vigência</th><th>Próx. contato</th><th>Tentativas</th><th>WhatsApp</th>
+                <th>Nome</th><th>Segmento</th><th>Telefone</th><th>Corretor</th><th>Status</th><th>Lead</th><th>Vigência</th><th>Próx. contato</th><th>WhatsApp</th>
               </tr>
             </thead>
             <tbody>
               {clients.map((c) => (
-                <tr key={c.id} className={`row-link${isOverdue(c.next_contact_date) ? " overdue" : ""}`} onClick={() => router.push(`/clientes/${c.id}`)}>
+                <tr key={c.id} className={`row-link${isOverdue(c.next_contact_date) ? " overdue" : ""}`} onClick={() => router.push(`/residencial/clientes/${c.id}`)}>
                   <td>{c.name}</td>
+                  <td>{c.tipo || "—"}</td>
                   <td>{c.phone || "—"}</td>
                   <td>{c.broker}</td>
                   <td><StatusBadge status={c.status} /></td>
                   <td><span className={`temp-dot temp-${c.lead_temperature}`} />{c.lead_temperature}</td>
                   <td>{formatDate(c.vigencia_date)}</td>
                   <td style={{ color: isOverdue(c.next_contact_date) ? "var(--danger)" : undefined, fontWeight: isOverdue(c.next_contact_date) ? 600 : 400 }}>{formatDate(c.next_contact_date)}</td>
-                  <td>{c.call_attempts}</td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    {whatsappLink(c.phone) ? (
-                      <a href={whatsappLink(c.phone)!} target="_blank" rel="noopener noreferrer" className="btn btn-sm">Abrir</a>
-                    ) : "—"}
+                    {whatsappLink(c.phone) ? <a href={whatsappLink(c.phone)!} target="_blank" rel="noopener noreferrer" className="btn btn-sm">Abrir</a> : "—"}
                   </td>
                 </tr>
               ))}
@@ -172,7 +165,7 @@ function ClientesContent() {
   );
 }
 
-export default function ClientesPage() {
+export default function ResidencialClientesPage() {
   return (
     <Suspense fallback={<p className="subtitle">Carregando...</p>}>
       <ClientesContent />

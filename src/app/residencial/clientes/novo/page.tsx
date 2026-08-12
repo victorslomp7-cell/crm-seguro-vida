@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BROKERS } from "@/lib/types";
+import { BROKERS, TIPOS_OUTROS } from "@/lib/types";
 
-export default function NovoClientePage() {
+export default function NovoClienteResidencialPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [cpf, setCpf] = useState("");
-  const [birthDate, setBirthDate] = useState("");
+  const [tipo, setTipo] = useState("");
   const [vigenciaDate, setVigenciaDate] = useState("");
   const [broker, setBroker] = useState("");
   const [error, setError] = useState("");
@@ -23,11 +23,11 @@ export default function NovoClientePage() {
       const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone: phone || null, cpf: cpf || null, birth_date: birthDate || null, vigencia_date: vigenciaDate, broker, ramo: "vida" }),
+        body: JSON.stringify({ name, phone: phone || null, cpf: cpf || null, vigencia_date: vigenciaDate, broker, ramo: "outros", tipo: tipo || null }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erro ao salvar cliente."); return; }
-      router.push(`/clientes/${data.id}`);
+      router.push(`/residencial/clientes/${data.id}`);
     } finally {
       setSaving(false);
     }
@@ -35,13 +35,19 @@ export default function NovoClientePage() {
 
   return (
     <div>
-      <h1>Novo cliente — Seguro de Vida</h1>
-      <p className="subtitle">Cadastre manualmente um segurado para a campanha de upsell.</p>
+      <h1>Novo cliente — Residencial / Empresarial</h1>
+      <p className="subtitle">Cadastre manualmente um cliente de seguro residencial ou empresarial.</p>
       <form className="card" style={{ maxWidth: 480 }} onSubmit={handleSubmit}>
         <div className="field"><label>Nome *</label><input value={name} onChange={(e) => setName(e.target.value)} required /></div>
         <div className="field"><label>Telefone</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-9999" /></div>
-        <div className="field"><label>CPF</label><input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" /></div>
-        <div className="field"><label>Data de nascimento</label><input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></div>
+        <div className="field"><label>CPF / CNPJ</label><input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" /></div>
+        <div className="field">
+          <label>Segmento *</label>
+          <select value={tipo} onChange={(e) => setTipo(e.target.value)} required>
+            <option value="">Selecione...</option>
+            {TIPOS_OUTROS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
         <div className="field"><label>Data de início de vigência *</label><input type="date" value={vigenciaDate} onChange={(e) => setVigenciaDate(e.target.value)} required /></div>
         <div className="field">
           <label>Corretor responsável *</label>

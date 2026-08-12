@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db, ready } from "@/lib/db";
 import { ASSIGNABLE_BROKERS } from "@/lib/types";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   await ready;
+  const ramo = req.nextUrl.searchParams.get("ramo") || "vida";
 
   const unassignedResult = await db.execute({
-    sql: "SELECT id FROM clients WHERE broker = 'Não atribuído'",
-    args: [],
+    sql: "SELECT id FROM clients WHERE broker = 'Não atribuído' AND ramo = ?",
+    args: [ramo],
   });
   const ids = unassignedResult.rows.map((r) => (r as unknown as { id: string }).id);
 

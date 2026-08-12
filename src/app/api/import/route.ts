@@ -26,7 +26,6 @@ function pick(row: Record<string, unknown>, candidates: string[]): unknown {
 function parseDate(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "number") {
-    // Excel serial date (days since 1899-12-30)
     const epoch = new Date(Date.UTC(1899, 11, 30));
     epoch.setUTCDate(epoch.getUTCDate() + value);
     const y = epoch.getUTCFullYear();
@@ -35,14 +34,12 @@ function parseDate(value: unknown): string | null {
     return `${y}-${mm}-${dd}`;
   }
   const str = String(value).trim();
-  // dd/mm/yyyy
   const br = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (br) {
     const [, d, m, y] = br;
     const year = y.length === 2 ? `20${y}` : y;
     return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  // yyyy-mm-dd already
   const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) {
     const [, y, m, d] = iso;
@@ -56,23 +53,22 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const defaultBroker = formData.get("broker") as string | null;
+  const ramo = (formData.get("ramo") as string | null) || "vida";
+  const defaultTipo = (formData.get("tipo") as string | null) || null;
 
   if (!file) {
     return NextResponse.json({ error: "Nenhum arquivo enviado." }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  // raw: true prevents xlsx from auto-detecting CSV date-like strings (e.g. "06/01/2026")
-  // and silently converting them to serial numbers using a US (MM/DD/YYYY) assumption,
-  // which would corrupt Brazilian dd/mm/yyyy dates.
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false, raw: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true });
 
   const now = new Date().toISOString();
-  const insertSql = `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, created_at, updated_at)
-     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, NULL, 0, @now, @now)`;
+  const insertSql = `INSERT INTO clients (id, name, phone, cpf, birth_date, vigencia_date, broker, status, lead_temperature, next_contact_date, call_attempts, ramo, tipo, created_at, updated_at)
+     VALUES (@id, @name, @phone, @cpf, @birth_date, @vigencia_date, @broker, @status, @lead_temperature, NULL, 0, @ramo, @tipo, @now, @now)`;
 
   let imported = 0;
   const errors: { row: number; reason: string }[] = [];
@@ -93,6 +89,7 @@ export async function POST(req: NextRequest) {
       "data_inicio_vigencia",
     ]);
     const brokerRaw = pick(row, ["corretor", "responsavel", "broker"]) ?? defaultBroker;
+    const tipoRaw = pick(row, ["tipo", "tipo de seguro", "segmento"]) ?? defaultTipo;
 
     if (!name || !vigenciaRaw) {
       errors.push({ row: idx + 2, reason: "Faltam dados obrigatórios (nome ou vigência)." });
@@ -123,6 +120,8 @@ export async function POST(req: NextRequest) {
         broker,
         status: STATUSES[0],
         lead_temperature: TEMPERATURES[1],
+        ramo,
+        tipo: tipoRaw ? String(tipoRaw).trim() : null,
         now,
       },
     });
